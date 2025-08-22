@@ -1,12 +1,20 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
+import { Idioma } from '../models/idioma.interface';
+import { Habilidade } from '../models/habilidade.interface';
 
-interface CadastroData {
+export interface CadastroData {
+  foto?: string | ArrayBuffer | null;
+  resumo?: string;
+  habilidadesSelecionadas?: Array<Habilidade>;
+  idiomas?: Array<Idioma>;
+  portfolio?: string;
+  linkedin?: string;
   areaAtuacao?: string;
   nivelExperiencia?: string;
   nomeCompleto?: string;
-  cidade?: string;
   estado?: string;
+  cidade?: string;
   email?: string;
   senha?: string;
 }
