@@ -1,14 +1,16 @@
 import { CadastroService } from './../../shared/services/cadastro.service';
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { AbstractControl, AbstractControlOptions, FormBuilder, FormGroup, ReactiveFormsModule, ValidationErrors, ValidatorFn, Validators } from '@angular/forms';
+import { AbstractControl, FormGroup, ReactiveFormsModule, ValidationErrors, ValidatorFn, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { ButtonComponent } from '../../shared/components/button/button.component';
 import { BehaviorSubject, Observable, of, startWith, switchMap, tap } from 'rxjs';
 import { Cidade, Estado, IbgeService } from '../../shared/services/ibge.service';
-import { cpfValidator } from '../../shared/validators/cpf.validator';
-import { emailExistenteValidator } from '../../shared/validators/emailExistente.validator';
 import { EmailValidatorService } from '../../shared/services/email-validator.service';
+import { DynamicFormService } from '../../shared/services/dynamic-form.service';
+import { getDadosPessoaisConfig } from '../../config/dados-pessoais-form.config';
+import { FormFieldBase } from '../../shared/models/form-field-base.interface';
+import { FormConfig } from '../../shared/models/form-config.inerface';
 
 export const senhasIguaisValidator: ValidatorFn = (control: AbstractControl): ValidationErrors | null => {
   const senha = control.get('senha');
@@ -16,7 +18,7 @@ export const senhasIguaisValidator: ValidatorFn = (control: AbstractControl): Va
 
   return senha && confirmaSenha && senha.value === confirmaSenha.value
     ? null
-    : { senhasDiferentes: true };
+    : { senhasNaoIguais: true };
 };
 
 @Component({
@@ -32,6 +34,7 @@ export const senhasIguaisValidator: ValidatorFn = (control: AbstractControl): Va
 })
 export class DadosPessoaisFormComponent implements OnInit {
   dadosPessoaisForm!: FormGroup;
+  formConfig!: FormConfig;
 
   estado$!: Observable<Estado[]>;
   cidades$!: Observable<Cidade[]>;
@@ -39,42 +42,26 @@ export class DadosPessoaisFormComponent implements OnInit {
   carregandoCidades$ = new BehaviorSubject<boolean>(false);
 
   constructor(
-    private fb: FormBuilder,
     private router: Router,
     private cadastroService: CadastroService,
     private ibgeService: IbgeService,
-    private emailService: EmailValidatorService
-  ) { }
+    private emailService: EmailValidatorService,
+    private dynamicFormService: DynamicFormService,
+  ) {
+    this.dynamicFormService.registerFormConfig('dadosPessoais', getDadosPessoaisConfig);
+  }
 
   ngOnInit(): void {
-    const formOptions: AbstractControlOptions = {
-      validators: senhasIguaisValidator
-    };
+    this.formConfig = this.dynamicFormService.getFormConfig('dadosPessoais', this.emailService);
 
-    this.dadosPessoaisForm = this.fb.group({
-      nomeCompleto: ['', Validators.required],
-      cpf: ['', [Validators.required, cpfValidator]],
-      estado: ['', Validators.required],
-      cidade: ['', Validators.required],
-      email: [
-        '',
-        [Validators.required, Validators.email],
-        [emailExistenteValidator(this.emailService)]
-      ],
-      senha: ['', [Validators.required, Validators.minLength(6)]],
-      confirmaSenha: ['', Validators.required]
-    }, formOptions);
+    this.dadosPessoaisForm = this.dynamicFormService.createFormGroup(
+      this.formConfig,
+      { validators: senhasIguaisValidator }
+    );
 
     this.carregarEstados();
     this.configurarListenerEstado();
 
-  }
-
-  senhasIguaisValidator(group: FormGroup): { [key: string]: any } | null {
-    const senha = group.get('senha')?.value;
-    const confirmaSenha = group.get('confirmaSenha')?.value;
-
-    return senha === confirmaSenha ? null : { senhasNaoIguais: true };
   }
 
   onAnterior(): void {
@@ -85,10 +72,22 @@ export class DadosPessoaisFormComponent implements OnInit {
   onProximo(): void {
     if (this.dadosPessoaisForm.valid) {
       this.salvarDadosAtuais();
-      this.router.navigate(['/cadastro/confirmacao']);
+      this.router.navigate(['/cadastro/perfil']);
     } else {
       this.dadosPessoaisForm.markAllAsTouched();
     }
+  }
+
+  isFieldType(field: FormFieldBase, type: string): boolean {
+    return field.type === type;
+  }
+
+  hasField(name: string): boolean {
+    return this.formConfig.fields.some(field => field.formControlName === name);
+  }
+
+  getFieldByName(name: string): FormFieldBase {
+    return this.formConfig.fields.find(field => field.formControlName === name) || {} as FormFieldBase;
   }
 
   private salvarDadosAtuais(): void {
